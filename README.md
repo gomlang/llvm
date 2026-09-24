@@ -31,7 +31,7 @@ A GoML consumer declares the normal versioned dependency:
 ```
 
 The library declares its Go adapter, required cgo, and LLVM major in `[native]`.
-The consumer needs only a minimal [go.mod](../../goml-dev/ecosystem/consumers/llvm/go.mod); the driver
+The consumer needs only a minimal [go.mod](consumer/go.mod); the driver
 generates requirements and replacements pointing at the selected registry source.
 It verifies cgo and LLVM 18 before compilation. Registry publication includes the
 adapter sources but does not install the LLVM shared library or set linker paths.
@@ -180,7 +180,7 @@ after transformation and invalidates module handles just like `run_passes`.
 Reacquire functions, blocks and instructions through the traversal APIs afterward.
 Address escape and unsupported memory uses can prevent promotion. See the
 [LLVM mutable-variable tutorial](https://releases.llvm.org/18.1.8/docs/tutorial/MyFirstLanguageFrontend/LangImpl07.html)
-and the executable [nested-loop example](../../goml-dev/ecosystem/consumers/llvm/tests/ssa_execution_test.gom).
+and the executable [nested-loop example](consumer/tests/ssa_execution_test.gom).
 
 ## Resource lifecycle and concurrency
 
@@ -316,7 +316,7 @@ implemented. Calling conventions use LLVM's default C convention.
 From the repository root:
 
 ```sh
-just ecosystem-test llvm
+(cd ../verification && just ecosystem-test llvm)
 ```
 
 Nineteen GoML library tests, five consumer tests and twelve native adapter tests
