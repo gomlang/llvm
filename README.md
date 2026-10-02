@@ -180,7 +180,7 @@ after transformation and invalidates module handles just like `run_passes`.
 Reacquire functions, blocks and instructions through the traversal APIs afterward.
 Address escape and unsupported memory uses can prevent promotion. See the
 [LLVM mutable-variable tutorial](https://releases.llvm.org/18.1.8/docs/tutorial/MyFirstLanguageFrontend/LangImpl07.html)
-and the executable [nested-loop example](testdata/downstream/native/tests/ssa_execution_test.gom).
+and the executable [nested-loop example](testdata/downstream/native/tests/ssa_execution_test.goml).
 
 ## Resource lifecycle and concurrency
 
@@ -345,7 +345,7 @@ and [object emission tutorial](https://releases.llvm.org/18.1.8/docs/tutorial/My
 
 ## Development and downstream checks
 
-Requires GoML 0.1.55 or newer. The independent native fixture is in `testdata/downstream/native/`; it retains a separate manifest and Go module for native dependencies. From the library root, run:
+Requires GoML 0.1.56 or newer. The independent native fixture is in `testdata/downstream/native/`; it retains a separate manifest and Go module for native dependencies. From the library root, run:
 
 ```sh
 goml test
