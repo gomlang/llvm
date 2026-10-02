@@ -1,6 +1,6 @@
 package tests;
 
-use consumer::llvm as app;
+use downstream::llvm as app;
 use ecosystem::llvm::{Context, TargetOptions, CodeModel, OptimizationLevel};
 use std::fs;
 use std::testing;

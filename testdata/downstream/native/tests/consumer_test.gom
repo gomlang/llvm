@@ -1,6 +1,6 @@
 package tests;
 
-use consumer::llvm;
+use downstream::llvm as llvm;
 use std::testing;
 
 #[test]

@@ -31,7 +31,7 @@ A GoML consumer declares the normal versioned dependency:
 ```
 
 The library declares its Go adapter, required cgo, and LLVM major in `[native]`.
-The consumer needs only a minimal [go.mod](consumer/go.mod); the driver
+The consumer needs only a minimal [go.mod](testdata/downstream/native/go.mod); the driver
 generates requirements and replacements pointing at the selected registry source.
 It verifies cgo and LLVM 18 before compilation. Registry publication includes the
 adapter sources but does not install the LLVM shared library or set linker paths.
@@ -180,7 +180,7 @@ after transformation and invalidates module handles just like `run_passes`.
 Reacquire functions, blocks and instructions through the traversal APIs afterward.
 Address escape and unsupported memory uses can prevent promotion. See the
 [LLVM mutable-variable tutorial](https://releases.llvm.org/18.1.8/docs/tutorial/MyFirstLanguageFrontend/LangImpl07.html)
-and the executable [nested-loop example](consumer/tests/ssa_execution_test.gom).
+and the executable [nested-loop example](testdata/downstream/native/tests/ssa_execution_test.gom).
 
 ## Resource lifecycle and concurrency
 
@@ -319,8 +319,8 @@ From the repository root:
 (cd ../verification && just ecosystem-test llvm)
 ```
 
-Nineteen GoML library tests, five consumer tests and twelve native adapter tests
-cover errors, concurrency and resource lifetimes. A GoML consumer invokes installed LLVM 18 tools and
+Nineteen GoML library tests, five native downstream tests and twelve native adapter tests
+cover errors, concurrency and resource lifetimes. The native downstream fixture invokes installed LLVM 18 tools and
 cc through `std::process`, verifies emitted IR/bitcode, assembles/disassembles it,
 links unoptimized/optimized objects, assembly and an explicit portable x86-64
 target, and compares 12,030 native
@@ -342,3 +342,14 @@ late PHI creation, parallel edges, operand edits, use replacement and erasure.
 The APIs follow LLVM 18's [target-machine C interface](https://github.com/llvm/llvm-project/blob/llvmorg-18.1.8/llvm/include/llvm-c/TargetMachine.h),
 [target-data interface](https://github.com/llvm/llvm-project/blob/llvmorg-18.1.8/llvm/include/llvm-c/Target.h)
 and [object emission tutorial](https://releases.llvm.org/18.1.8/docs/tutorial/MyFirstLanguageFrontend/LangImpl08.html).
+
+## Development and downstream checks
+
+Requires GoML 0.1.55 or newer. The independent native fixture is in `testdata/downstream/native/`; it retains a separate manifest and Go module for native dependencies. From the library root, run:
+
+```sh
+goml test
+goml verify --timeout 300s
+```
+
+`goml verify` builds and tests the fixture against an isolated registry snapshot. `(cd ../verification && just ecosystem-test llvm)` also runs the library-specific smoke and compatibility checks.
