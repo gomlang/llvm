@@ -1,0 +1,101 @@
+package tests;
+
+use ecosystem::llvm::{Context, Module, LlvmError, BinaryOp, OptimizationLevel};
+use std::testing;
+use std::fs;
+use std::num;
+
+fn aggregate_workload(context: Context) -> Result[Module, LlvmError] {
+    let module = context.module("aggregate_workload")?;
+    let integer = context.int_type(64)?;
+    let array_type = context.array_type(integer, 2)?;
+    let signature = context.function_type(integer, Vec::from_array([integer, integer]), false)?;
+    let builder = context.builder()?;
+    defer {
+        let _ = builder.close();
+    };
+    for packed in Vec::from_array([false, true]) {
+        let pair = context.struct_type(Vec::from_array([integer, array_type]), packed)?;
+        let function = module.add_function(
+            if packed {
+                "packed"
+            } else {
+                "ordinary"
+            },
+            signature,
+        )?;
+        builder.position_at_end(function.append_block("entry")?)?;
+        let x = function.parameter(0)?;
+        let y = function.parameter(1)?;
+        let sum = builder.binary(BinaryOp::Add, x, y, "sum")?;
+        let triple = builder.binary(BinaryOp::Mul, x, integer.const_signed(3)?, "triple")?;
+        let array = builder.insert_value(array_type.zero()?, sum, 0, "first")?;
+        let array = builder.insert_value(array, triple, 1, "second")?;
+        let original = builder.insert_value(pair.zero()?, array, 1, "original")?;
+        let difference = builder.binary(BinaryOp::Sub, x, y, "difference")?;
+        let updated = builder.insert_value(original, difference, 0, "updated")?;
+        let tag = builder.extract_value(updated, 0, "tag")?;
+        let untouched = builder.extract_value(original, 0, "untouched")?;
+        let nested = builder.extract_value(updated, 1, "nested")?;
+        let first = builder.extract_value(nested, 0, "a")?;
+        let second = builder.extract_value(nested, 1, "b")?;
+        let twice = builder.binary(BinaryOp::Mul, first, integer.const_signed(2)?, "twice")?;
+        let thrice = builder.binary(BinaryOp::Mul, second, integer.const_signed(3)?, "thrice")?;
+        let total = builder.binary(
+            BinaryOp::Add,
+            tag,
+            builder.binary(BinaryOp::Add, twice, thrice, "terms")?,
+            "total",
+        )?;
+        builder.ret(builder.binary(BinaryOp::Add, total, untouched, "result")?)?;
+    }
+    module.verify()?;
+    Result::Ok(module)
+}
+
+#[test]
+fn nested_runtime_aggregates_match_native_reference_before_and_after_optimization() -> () {
+    let directory = "_artifact/native-aggregate-reference";
+    testing::assert_ok(fs::create_dir_all(directory));
+    let context = Context::new();
+    defer {
+        let _ = context.close();
+    };
+    let module = testing::expect_ok(aggregate_workload(context), "aggregate workload");
+    let ir = testing::expect_ok(module.ir(), "unoptimized IR");
+    testing::assert(ir.contains("insertvalue"));
+    testing::assert(ir.contains("extractvalue"));
+    for phase in 0..2 {
+        if phase == 1 {
+            testing::assert_ok(module.optimize(OptimizationLevel::Aggressive));
+        }
+        let prefix = directory + "/phase-" + phase.to_string();
+        testing::assert_ok(
+            fs::write_file_structured(prefix + ".ll", testing::expect_ok(module.ir(), "IR")),
+        );
+        let _ = native_tool(
+            "/usr/lib/llvm-18/bin/opt",
+            Vec::from_array(["-passes=verify", "-disable-output", prefix + ".ll"]),
+        );
+        testing::assert_ok(module.emit_object(prefix + ".o", OptimizationLevel::None));
+        let _ = native_tool(
+            "cc",
+            Vec::from_array(["-O2", "tests/data/aggregate_harness.c", prefix + ".o", "-o", prefix]),
+        );
+        let output = native_tool(prefix, Vec::new());
+        let lines = output.trim().split("\n");
+        testing::assert_eq(lines.len(), 121);
+        for index in 0..121 {
+            let x = index / 11 - 5;
+            let y = index % 11 - 5;
+            let fields = lines[index].split(" ");
+            testing::assert_eq(fields.len(), 2);
+            for field in fields {
+                testing::assert_eq(
+                    testing::expect_ok(num::parse_int_structured(field), "native result"),
+                    12 * x + y,
+                );
+            }
+        }
+    }
+}

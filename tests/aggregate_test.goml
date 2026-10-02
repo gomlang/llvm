@@ -1,0 +1,43 @@
+package tests;
+
+use ecosystem::llvm::{Context, ErrorKind};
+use std::testing;
+
+#[test]
+fn aggregate_builders_validate_indices_types_and_insertion_points() -> () {
+    let context = Context::new();
+    defer {
+        let _ = context.close();
+    };
+    let (module, integer, function, builder) = setup(context);
+    let pair = ok(context.struct_type(Vec::from_array([integer, integer]), false));
+    let zero = ok(pair.zero());
+    let input = ok(function.parameter(0));
+    let original = ok(builder.insert_value(zero, input, 1, "original"));
+    let first = ok(builder.extract_value(original, 0, "first"));
+    let second = ok(builder.extract_value(original, 1, "second"));
+    testing::assert(ok(ok(first.value_type()).same_as(integer)));
+    invalid(builder.extract_value(original, -1, ""), ErrorKind::Argument);
+    invalid(builder.extract_value(original, 2, ""), ErrorKind::Argument);
+    invalid(builder.extract_value(original, 4294967296, ""), ErrorKind::Argument);
+    invalid(builder.extract_value(input, 0, ""), ErrorKind::Argument);
+    invalid(builder.insert_value(original, zero, 1, ""), ErrorKind::Argument);
+    invalid(builder.insert_value(original, input, 0, "bad\u0000name"), ErrorKind::Argument);
+    ok(builder.ret(second));
+    invalid(builder.extract_value(original, 0, ""), ErrorKind::Argument);
+    ok(module.verify());
+    let phi_module = ok(
+        context.parse_ir(
+            "define i64 @f(i64 %x) { entry: br label %end\nend: %p = phi i64 [%x, %entry]\nret i64 %p }",
+        ),
+    );
+    let phi_function = ok(phi_module.function("f"));
+    let blocks = ok(phi_function.blocks());
+    let phi = ok(blocks[1].instructions())[0];
+    ok(builder.position_before(phi));
+    invalid(builder.extract_value(zero, 0, ""), ErrorKind::Argument);
+    invalid(builder.insert_value(zero, ok(integer.zero()), 0, ""), ErrorKind::Argument);
+    ok(phi_module.verify());
+    ok(builder.clear_position());
+    invalid(builder.extract_value(zero, 0, ""), ErrorKind::Argument);
+}
