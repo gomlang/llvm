@@ -1,0 +1,68 @@
+package tests;
+
+use ecosystem::llvm::{Context, BinaryOp, CastOp, OptimizationLevel, ErrorKind};
+use std::fs;
+use std::testing;
+
+#[test]
+fn wide_integer_text_constants_execute_after_native_lowering() -> () {
+    let context = Context::new();
+    defer {
+        testing::assert_ok(context.close());
+    };
+    let module = testing::expect_ok(context.module("wide_constants"), "module");
+    let integer = testing::expect_ok(context.int_type(128), "i128");
+    let result = testing::expect_ok(context.int_type(64), "i64");
+    let signature = testing::expect_ok(
+        context.function_type(result, Vec::new(), false),
+        "signature",
+    );
+    let function = testing::expect_ok(module.add_function("wide_constant", signature), "function");
+    let builder = testing::expect_ok(context.builder(), "builder");
+    testing::assert_ok(
+        builder.position_at_end(testing::expect_ok(function.append_block("entry"), "block")),
+    );
+    let wide = testing::expect_ok(
+        integer.const_int_text("123456789abcdef0123456789abcdef0", 16),
+        "128-bit value",
+    );
+    let shift = testing::expect_ok(integer.const_int_text("64", 10), "shift count");
+    let high = testing::expect_ok(
+        builder.binary(BinaryOp::LogicalShiftRight, wide, shift, "high"),
+        "shift",
+    );
+    let truncated = testing::expect_ok(
+        builder.cast(CastOp::Truncate, high, result, "result"),
+        "truncate",
+    );
+    testing::assert_ok(builder.ret(truncated));
+    testing::assert_ok(module.verify());
+    let restored = testing::expect_ok(
+        context.parse_bitcode(testing::expect_ok(module.bitcode(), "bitcode")),
+        "restore",
+    );
+    testing::assert_ok(restored.verify());
+    let path = "_artifact/wide-integer-text";
+    testing::assert_ok(fs::create_dir_all(path));
+    testing::assert_ok(module.emit_object(path + "/wide.o", OptimizationLevel::Default));
+    testing::assert_ok(
+        fs::write_file_structured(
+            path + "/harness.c",
+            "#include <stdint.h>\nextern uint64_t wide_constant(void);\nint main(void) { return wide_constant() == UINT64_C(0x123456789abcdef0) ? 0 : 1; }\n",
+        ),
+    );
+    let _ = native_tool(
+        "cc",
+        Vec::from_array([path + "/harness.c", path + "/wide.o", "-o", path + "/run"]),
+    );
+    let _ = native_tool(path + "/run", Vec::new());
+    testing::assert_eq(
+        testing::expect_err(
+            integer.const_int_text("340282366920938463463374607431768211456", 10),
+            "overflow",
+        ).kind,
+        ErrorKind::Argument,
+    );
+    testing::assert_ok(module.close());
+    testing::assert(!wide.is_closed());
+}
