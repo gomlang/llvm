@@ -127,6 +127,12 @@ impl Type {
         self.const_int(value.to_u64(), true)
     }
 
+    pub fn const_int_text(self: Type, value: string, radix: isize) -> Result[Value, LlvmError] {
+        Result::Ok(
+            Value { raw: handle(raw_integer_text(self.raw, ffi::string_from_text(value), radix))? },
+        )
+    }
+
     pub fn const_float(self: Type, value: f64) -> Result[Value, LlvmError] {
         self.constant(2, 0, value)
     }

@@ -68,6 +68,12 @@ extern fn raw_aggregate(handle: NativeHandle, elements: ffi::RawSlice[NativeHand
     ffi::String,
 );
 
+#[go_ffi("example.com/goml-ecosystem/llvm/adapter", "IntegerText")]
+extern fn raw_integer_text(handle: NativeHandle, value: ffi::String, radix: isize) -> (
+    NativeHandle,
+    ffi::String,
+);
+
 #[go_ffi("example.com/goml-ecosystem/llvm/adapter", "Function")]
 extern fn raw_function(
     handle: NativeHandle,

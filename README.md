@@ -81,7 +81,7 @@ types and signatures compatible with its ABI.
 | --- | --- |
 | Context | `new`, `module`, `builder`, `target_machine`, `parse_ir`, `parse_bitcode`, `close`, `is_closed` |
 | Types | `void_type`, `int_type`, `float_type`, `double_type`, opaque `pointer_type`, `array_type`, literal `struct_type`, `function_type` |
-| Type values | `same_as`, `ir`, `const_int`, `const_signed`, `const_float`, `zero`, `undef`, `const_aggregate` |
+| Type values | `same_as`, `ir`, `const_int`, `const_signed`, `const_int_text`, `const_float`, `zero`, `undef`, `const_aggregate` |
 | Module | `add_function`, `function`, `ir`, `verify`, `clone`, `bitcode`, `target_triple`, `data_layout`, `optimize`, `run_passes`, `emit_object`, `emit_assembly`, `close` |
 | Target discovery | `target_names`, `normalize_triple`, `TargetOptions::new`, `TargetOptions::native` |
 | Target machine | `triple`, `cpu`, `features`, `name`, `data_layout`, `configure`, `optimize`, `run_passes`, file/memory emission, `close`, `is_closed` |
@@ -106,7 +106,17 @@ Integer widths range from 1 to 65,536 bits. Array lengths are capped at
 be variadic. Arrays and structs accept checked aggregate constants.
 `const_int(bits, sign_extend)` accepts a 64-bit pattern, truncating it for narrower
 types and extending it for wider types. `const_signed(i64)` requests signed
-extension. Arbitrary-width integer parsing is not exposed.
+extension. `const_int_text(text, radix)` constructs arbitrary-width constants
+without truncation. Radix is explicitly 2, 8, 10 or 16; text contains an optional
+`+`/`-` followed by 1 through 65,536 ASCII digits. Hex digits are case-insensitive;
+prefixes, separators, whitespace and embedded NULs are rejected. For an `iN`
+type, nonnegative values must fit `0..2^N-1`, and negative values must fit
+`-2^(N-1)..-1`. Signed and unsigned spellings denote the same native bit pattern
+when equivalent; LLVM may print a large positive bit pattern as a negative
+integer. Invalid text, radix, widths over 65,536 and overflow return `Argument`.
+Returned constants belong to the context and remain valid after a module closes.
+For example, an i128 type accepts
+`const_int_text("1000000000000000000000000000001", 16)` (2^120 + 1).
 
 `BinaryOp` covers integer arithmetic, signed/unsigned division and remainder,
 bitwise operations and shifts, plus floating arithmetic. `IntPredicate` includes
@@ -319,7 +329,7 @@ From the repository root:
 (cd ../verification && just ecosystem-test llvm)
 ```
 
-Nineteen GoML library tests, five native downstream tests and twelve native adapter tests
+Nineteen GoML library tests, six native downstream tests and fourteen native adapter tests
 cover errors, concurrency and resource lifetimes. The native downstream fixture invokes installed LLVM 18 tools and
 cc through `std::process`, verifies emitted IR/bitcode, assembles/disassembles it,
 links unoptimized/optimized objects, assembly and an explicit portable x86-64
@@ -338,6 +348,11 @@ points, erasure and concurrent close. An additional native workload promotes
 nested loops with multiple backedges, inspects the generated PHIs, and checks
 390 results across original, promoted and optimized objects. It also exercises
 late PHI creation, parallel edges, operand edits, use replacement and erasure.
+
+Integer-text regressions cover all supported radices, signed/unsigned bounds,
+i1/i65/i128/i65536, malformed inputs, constant lifetime and concurrent closure.
+A downstream native executable extracts the high half of a 128-bit hexadecimal
+constant and checks it against a C integer constant after object emission.
 
 The APIs follow LLVM 18's [target-machine C interface](https://github.com/llvm/llvm-project/blob/llvmorg-18.1.8/llvm/include/llvm-c/TargetMachine.h),
 [target-data interface](https://github.com/llvm/llvm-project/blob/llvmorg-18.1.8/llvm/include/llvm-c/Target.h)

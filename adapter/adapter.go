@@ -25,6 +25,7 @@ import "C"
 
 import (
 	"fmt"
+	"math/big"
 	"sort"
 	"strings"
 	"sync"
@@ -505,6 +506,66 @@ func Constant(handle Handle, kind int, integer uint64, real float64) (Handle, st
 	default:
 		return nil, "argument: unknown constant kind"
 	}
+	return wrapValue(ctx, nil, nil, result), ""
+}
+
+func IntegerText(handle Handle, input string, radix int) (Handle, string) {
+	ctx, nodes, err := enter(handle)
+	if err != "" {
+		return nil, err
+	}
+	defer ctx.mu.Unlock()
+	if nodes[0].kind != typeKind {
+		return nil, "argument: expected integer type"
+	}
+	ty := C.LLVMTypeRef(nodes[0].raw)
+	if C.LLVMGetTypeKind(ty) != C.LLVMIntegerTypeKind {
+		return nil, "argument: integer text requires integer type"
+	}
+	width := uint(C.LLVMGetIntTypeWidth(ty))
+	if width > 65536 || len(input) == 0 || len(input) > 65537 {
+		return nil, "argument: integer text or type exceeds 65536-bit parsing limit"
+	}
+	if radix != 2 && radix != 8 && radix != 10 && radix != 16 {
+		return nil, "argument: integer radix must be 2, 8, 10 or 16"
+	}
+	digits := input
+	if digits[0] == '+' || digits[0] == '-' {
+		digits = digits[1:]
+	}
+	if len(digits) == 0 || len(digits) > 65536 {
+		return nil, "argument: expected 1 through 65536 integer digits"
+	}
+	for _, ch := range []byte(digits) {
+		value := -1
+		switch {
+		case ch >= '0' && ch <= '9':
+			value = int(ch - '0')
+		case ch >= 'a' && ch <= 'f':
+			value = int(ch-'a') + 10
+		case ch >= 'A' && ch <= 'F':
+			value = int(ch-'A') + 10
+		}
+		if value < 0 || value >= radix {
+			return nil, "argument: invalid integer digit"
+		}
+	}
+	value, ok := new(big.Int).SetString(input, radix)
+	if !ok {
+		return nil, "argument: invalid integer text"
+	}
+	if value.Sign() < 0 {
+		minimum := new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), width-1))
+		if value.Cmp(minimum) < 0 {
+			return nil, "argument: signed integer does not fit type"
+		}
+	} else if value.BitLen() > int(width) {
+		return nil, "argument: unsigned integer does not fit type"
+	}
+	canonical := value.Text(10)
+	raw := C.CString(canonical)
+	defer C.free(unsafe.Pointer(raw))
+	result := C.LLVMConstIntOfStringAndSize(ty, raw, C.uint(len(canonical)), 10)
 	return wrapValue(ctx, nil, nil, result), ""
 }
 
