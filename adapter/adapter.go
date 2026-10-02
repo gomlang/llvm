@@ -1007,6 +1007,66 @@ func Cast(builder Handle, operation int, value, target Handle, name string) (Han
 	return instruction(b, C.LLVMBuildCast(C.LLVMBuilderRef(b.raw), opcode, C.LLVMValueRef(n.raw), dest, raw)), ""
 }
 
+func ExtractValue(builder, aggregate Handle, index int, name string) (Handle, string) {
+	return aggregateValue(builder, aggregate, index, name)
+}
+
+func InsertValue(builder, aggregate, value Handle, index int, name string) (Handle, string) {
+	return aggregateValue(builder, aggregate, index, name, value)
+}
+
+func aggregateValue(builder, aggregate Handle, index int, name string, replacement ...Handle) (Handle, string) {
+	ctx, ns, err := enter(append([]Handle{builder, aggregate}, replacement...)...)
+	if err != "" {
+		return nil, err
+	}
+	defer ctx.mu.Unlock()
+	b, a := ns[0], ns[1]
+	if err := insertion(b); err != "" {
+		return nil, err
+	}
+	if err := operand(b, a); err != "" {
+		return nil, err
+	}
+	if index < 0 || uint64(index) > 4294967295 {
+		return nil, "argument: aggregate index out of range"
+	}
+	value := C.LLVMValueRef(a.raw)
+	ty := C.LLVMTypeOf(value)
+	var member C.LLVMTypeRef
+	switch C.LLVMGetTypeKind(ty) {
+	case C.LLVMStructTypeKind:
+		if C.LLVMIsOpaqueStruct(ty) != 0 || uint64(index) >= uint64(C.LLVMCountStructElementTypes(ty)) {
+			return nil, "argument: aggregate index out of range"
+		}
+		member = C.LLVMStructGetTypeAtIndex(ty, C.uint(index))
+	case C.LLVMArrayTypeKind:
+		if uint64(index) >= uint64(C.LLVMGetArrayLength2(ty)) {
+			return nil, "argument: aggregate index out of range"
+		}
+		member = C.LLVMGetElementType(ty)
+	default:
+		return nil, "argument: expected struct or array aggregate"
+	}
+	if len(replacement) > 0 {
+		if err := operand(b, ns[2]); err != "" {
+			return nil, err
+		}
+		if C.LLVMTypeOf(C.LLVMValueRef(ns[2].raw)) != member {
+			return nil, "argument: inserted value has wrong aggregate member type"
+		}
+	}
+	raw, free, err := text(name)
+	if err != "" {
+		return nil, err
+	}
+	defer free()
+	if len(replacement) > 0 {
+		return instruction(b, C.LLVMBuildInsertValue(C.LLVMBuilderRef(b.raw), value, C.LLVMValueRef(ns[2].raw), C.uint(index), raw)), ""
+	}
+	return instruction(b, C.LLVMBuildExtractValue(C.LLVMBuilderRef(b.raw), value, C.uint(index), raw)), ""
+}
+
 func Emit(builder Handle, operation int, arguments []Handle, name string) (Handle, string) {
 	ctx, nodes, err := enter(append([]Handle{builder}, arguments...)...)
 	if err != "" {

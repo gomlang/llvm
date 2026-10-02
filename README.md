@@ -94,6 +94,7 @@ types and signatures compatible with its ABI.
 | Local variables | `Local::read`, `Local::write`, `Module::promote_locals` |
 | Builder arithmetic | `binary`, `int_compare`, `float_compare`, `cast`, `select` |
 | Builder control flow | `position_at_end`, `call`, `ret`, `ret_void`, `branch`, `conditional_branch`, `phi`, `unreachable` |
+| Builder aggregates | `extract_value`, `insert_value` |
 | Builder memory | `alloca`, `load`, `store`, `gep` |
 
 All handle types expose `is_closed`. Operations that can fail return
@@ -123,6 +124,20 @@ bitwise operations and shifts, plus floating arithmetic. `IntPredicate` includes
 signed/unsigned comparisons; `FloatPredicate` includes ordered/unordered
 comparisons. `CastOp` covers integer extension/truncation, numeric floating
 conversions, pointer/integer conversion and checked equal-width bitcasts.
+
+`extract_value(aggregate, index, name)` reads a struct field or array element.
+`insert_value(aggregate, value, index, name)` returns an updated aggregate without
+changing the original value. These operations accept runtime values as well as
+constants, including packed structs and nested aggregates. Each call selects one
+immediate member; chain calls to descend into nested aggregates, then insert the
+updated inner aggregate into its parent. The index is a nonnegative constant
+that must fit the LLVM C API's 32-bit index and be within the aggregate bounds.
+The inserted value must have exactly the selected member's type. Scalar/vector
+inputs, empty aggregates, invalid indices, mixed contexts or functions, and
+mismatched member types return recoverable errors before instruction construction.
+Both methods require a valid insertion point, even when LLVM folds the result
+into a constant. Folded constants retain their actual context/module lifetime.
+See LLVM 18's [aggregate instruction semantics](https://releases.llvm.org/18.1.8/docs/LangRef.html#aggregate-operations).
 
 Each block accepts one terminator, and phi instructions must precede its non-phi
 instructions. Builders support block-end insertion and explicit insertion points.

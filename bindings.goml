@@ -166,3 +166,20 @@ extern fn raw_emit_file(handle: NativeHandle, path: ffi::String, assembly: bool,
 
 #[go_ffi("example.com/goml-ecosystem/llvm/adapter", "Version")]
 extern fn raw_version() -> ffi::String;
+
+#[go_ffi("example.com/goml-ecosystem/llvm/adapter", "ExtractValue")]
+extern fn raw_extract_value(
+    builder: NativeHandle,
+    aggregate: NativeHandle,
+    index: isize,
+    name: ffi::String,
+) -> (NativeHandle, ffi::String);
+
+#[go_ffi("example.com/goml-ecosystem/llvm/adapter", "InsertValue")]
+extern fn raw_insert_value(
+    builder: NativeHandle,
+    aggregate: NativeHandle,
+    value: NativeHandle,
+    index: isize,
+    name: ffi::String,
+) -> (NativeHandle, ffi::String);

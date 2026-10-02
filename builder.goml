@@ -186,6 +186,38 @@ impl Builder {
         Result::Ok(())
     }
 
+    pub fn extract_value(self: Builder, aggregate: Value, index: isize, name: string) -> Result[
+        Value,
+        LlvmError,
+    ] {
+        Result::Ok(
+            Value {
+                raw: handle(
+                    raw_extract_value(self.raw, aggregate.raw, index, ffi::string_from_text(name)),
+                )?,
+            },
+        )
+    }
+
+    pub fn insert_value(self: Builder, aggregate: Value, value: Value, index: isize, name: string) -> Result[
+        Value,
+        LlvmError,
+    ] {
+        Result::Ok(
+            Value {
+                raw: handle(
+                    raw_insert_value(
+                        self.raw,
+                        aggregate.raw,
+                        value.raw,
+                        index,
+                        ffi::string_from_text(name),
+                    ),
+                )?,
+            },
+        )
+    }
+
     pub fn gep(
         self: Builder,
         source_type: Type,
