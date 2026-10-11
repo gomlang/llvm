@@ -2,4 +2,4 @@
 path = "downstream::llvm"
 
 [dependencies]
-"ecosystem::llvm" = "0.1.0"
+"ecosystem::llvm" = true

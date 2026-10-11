@@ -23,11 +23,11 @@ major versions require an adapter change and fresh verification. `version()`
 reports the linked LLVM version. The binding has no external Go module
 dependencies.
 
-A GoML consumer declares the normal versioned dependency:
+A GoML consumer declares the registry dependency:
 
 ```toml
 [dependencies]
-"ecosystem::llvm" = "0.1.0"
+"ecosystem::llvm" = true
 ```
 
 The library declares its Go adapter, required cgo, and LLVM major in `[native]`.
@@ -375,11 +375,10 @@ and [object emission tutorial](https://releases.llvm.org/18.1.8/docs/tutorial/My
 
 ## Development and downstream checks
 
-Requires GoML 0.1.56 or newer. The independent native fixture is in `testdata/downstream/native/`; it retains a separate manifest and Go module for native dependencies. From the library root, run:
+Use the GoML toolchain pinned by the shared ecosystem verifier. The independent native fixture is in `testdata/downstream/native/`; it retains a separate manifest and Go module for native dependencies. From the library root, run:
 
 ```sh
 goml test
-goml verify --timeout 300s
 ```
 
-`goml verify` builds and tests the fixture against an isolated registry snapshot. `(cd ../verification && just ecosystem-test llvm)` also runs the library-specific smoke and compatibility checks.
+Run `(cd ../verification && just ecosystem-test llvm)` for the independent downstream fixture and library-specific smoke and compatibility checks.
