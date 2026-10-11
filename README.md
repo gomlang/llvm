@@ -341,7 +341,7 @@ implemented. Calling conventions use LLVM's default C convention.
 From the repository root:
 
 ```sh
-(cd ../verification && just ecosystem-test llvm)
+(cd ../workflows && just ecosystem-test llvm)
 ```
 
 Nineteen GoML library tests, six native downstream tests and fourteen native adapter tests
@@ -381,4 +381,4 @@ Use the GoML toolchain pinned by the shared ecosystem verifier. The independent 
 goml test
 ```
 
-Run `(cd ../verification && just ecosystem-test llvm)` for the independent downstream fixture and library-specific smoke and compatibility checks.
+Run `(cd ../workflows && just ecosystem-test llvm)` for the independent downstream fixture and library-specific smoke and compatibility checks.
